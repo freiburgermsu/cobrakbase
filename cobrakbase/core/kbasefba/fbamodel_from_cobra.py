@@ -1,41 +1,97 @@
 import logging
 from cobrakbase.core.kbasefba.fbamodel_builder import FBAModelBuilder
 from cobrakbase.core.kbasefba.fbamodel_metabolite import ModelCompound
-from cobrakbase.core.kbasefba.fbamodel_reaction import ModelReaction, get_for_rev_flux_from_bounds
-from modelseedpy.core.msmodel import get_direction_from_constraints
+from cobrakbase.core.kbasefba.fbamodel_reaction import ModelReaction
+from cobrakbase.core.kbasefba.fbamodel_biomass import Biomass
 
 logger = logging.getLogger(__name__)
 
 
 class CobraModelConverter:
-
     def __init__(self, model, genome=None, template=None):
         self.model = model
         self.model_id = model.id
         self.template = template
         self.genome = genome
+        self.drain_exclude_set = {"rxn13782", "rxn13783", "rxn13784"}
+        self.extract_seed_it_from_identifier = (
+            False  # Detect seed id from identifier if annotation is missing
+        )
+
+    @staticmethod
+    def convert_reaction_to_biomass(reaction):
+        reaction_biomass = Biomass(reaction.id, reaction.name)
+        reaction_biomass.add_metabolites(reaction.metabolites)
+        reaction_biomass.notes = reaction.notes
+        reaction_biomass.annotation = reaction.annotation
+        return reaction_biomass
 
     @staticmethod
     def reaction_is_biomass(reaction):
         """
         detect biomass reaction from SBO term SBO:0000629
         """
-        return 'sbo' in reaction.annotation and reaction.annotation['sbo'] == "SBO:0000629"
+        return (
+            type(reaction) == Biomass
+            or "sbo" in reaction.annotation
+            and reaction.annotation["sbo"] == "SBO:0000629"
+        )
 
     @staticmethod
-    def reaction_is_drain(reaction):
+    def get_seed_id(reaction, detect_from_id=False):
+        if "seed.reaction" in reaction.annotation:
+            return reaction.annotation["seed.reaction"]
+        if detect_from_id:
+            if reaction.id.startswith("rxn") and reaction.id[3:8].isdigit():
+                return reaction.id[:8]
+        return None
+
+    @staticmethod
+    def reaction_is_drain(reaction, detect_from_id=False, exclude=None):
+        if exclude is None:
+            exclude = {}
         """
         assume reactions of size 1 as drain reactions
         if annotated with sbo SBO:0000176 overrides drain check
         """
-        if 'sbo' in reaction.annotation and reaction.annotation['sbo'] == "SBO:0000176":
+        if exclude is None:
+            exclude = set()
+        if "sbo" in reaction.annotation and reaction.annotation["sbo"] == "SBO:0000176":
             return False
-        return len(reaction.metabolites) == 1
+        if "sbo" in reaction.annotation and reaction.annotation["sbo"] in {
+            "SBO:0000632",
+            "SBO:0000628",
+        }:
+            return True
+        return (
+            CobraModelConverter.get_seed_id(reaction, detect_from_id) not in exclude
+            and len(reaction.metabolites) == 1
+        )
+
+    @staticmethod
+    def reaction_is_exchange(reaction, detect_from_id=False, exclude=None):
+        if exclude is None:
+            exclude = {}
+        """
+        assume reactions of size 1 as drain reactions
+        if annotated with sbo SBO:0000176 overrides drain check
+        """
+        if "sbo" in reaction.annotation and reaction.annotation["sbo"] == "SBO:0000176":
+            return False
+        if "sbo" in reaction.annotation and reaction.annotation["sbo"] == "SBO:0000627":
+            return True
+        compartments = reaction.compartments
+        return (
+            CobraModelConverter.get_seed_id(reaction, detect_from_id) not in exclude
+            and len(reaction.metabolites) == 1
+            and len(compartments) == 1
+            and (list(compartments)[0] == "e0" or list(compartments)[0] == "e")
+        )
 
     def get_template_ref(self):
         if self.template:
             return str(self.template.info)
-        return ''
+        return ""
 
     def get_genome_ref(self):
         if self.genome:
@@ -45,7 +101,9 @@ class CobraModelConverter:
     @property
     def metabolic_reactions(self):
         for reaction in self.model.reactions:
-            if not self.reaction_is_biomass(reaction) and not self.reaction_is_drain(reaction):
+            if not self.reaction_is_biomass(reaction) and not self.reaction_is_drain(
+                reaction, self.extract_seed_it_from_identifier, self.drain_exclude_set
+            ):
                 yield reaction
 
     @property
@@ -58,59 +116,53 @@ class CobraModelConverter:
         model_compartments = []
         for cmp_id in self.model.compartments:
             # TODO split cmp_id to extract index and compartment_ref no index assume 0
-            model_compartments.append({
-                'compartmentIndex': 0,
-                'id': cmp_id,
-                'label': self.model.compartments[cmp_id],
-                'compartment_ref': '~/template/compartments/id/' + cmp_id[0],
-                'pH': 7,
-                'potential': 0
-            })
+            model_compartments.append(
+                {
+                    "compartmentIndex": 0,
+                    "id": cmp_id,
+                    "label": self.model.compartments[cmp_id],
+                    "compartment_ref": "~/template/compartments/id/" + cmp_id[0],
+                    "pH": 7,
+                    "potential": 0,
+                }
+            )
 
-        model_compounds = []
+        model_compounds = {}
         for m in self.model.metabolites:
-            model_compound = ModelCompound({
-                'id': m.id,
-                'modelcompartment_ref': '~/modelcompartments/id/' + m.compartment,
-                'formula': m.formula,
-                'name': m.name,
-                'charge': m.charge
-            })
-            model_compounds.append(model_compound._to_json())
+            model_compound = ModelCompound(
+                m.id, m.formula, m.name, m.charge, m.compartment
+            )
+            model_compound.notes = m.notes
+            model_compound.annotation = m.annotation
+            if model_compound.id not in model_compounds:
+                model_compounds[model_compound.id] = model_compound
+            else:
+                logger.warning(f"duplicate metabolite {model_compound.id}")
 
         model_reactions = []
         for r in self.metabolic_reactions:
-            direction = get_direction_from_constraints(r.lower_bound, r.upper_bound)
-            if direction == '?':
-                logger.warning('invalid bounds assume reversible %s %s', r.lower_bound, r.upper_bound)
-                direction = '='
-            max_rev_flux, max_for_flux = get_for_rev_flux_from_bounds(r.lower_bound, r.upper_bound)
-            proteins = []
-            model_reaction_data = {
-                'id': r.id,
-                'name': r.name,
-                'direction': direction,
-                'aliases': [],
-                'coverage': 3,
-                'dblinks': {},
-                'edits': {}, 'gapfill_data': {},
-                'gene_count': 0,
-                'maxrevflux': max_rev_flux,
-                'maxforflux': max_for_flux,
-                'modelReactionProteins': proteins,
-                'modelReactionReagents': [],
-                'modelcompartment_ref': '~/modelcompartments/id/c0',
-                'numerical_attributes': {}, 'string_attributes': {},
-                'probability': 1,
-                'protons': 0,
-                'reaction_ref': '~/template/reactions/id/' + r.id[:-1],
-            }
-            model_reaction = ModelReaction(model_reaction_data)
-            model_reaction.add_metabolites(r.metabolites)
-            model_reactions.append(model_reaction._to_json())
+            model_reaction = ModelReaction(
+                r.id,
+                r.name,
+                r.subsystem,
+                r.lower_bound,
+                r.upper_bound,
+                imported_gpr=r.gene_reaction_rule,
+            )
+            model_reaction.notes = r.notes
+            model_reaction.annotation = r.annotation
+            model_reaction.gene_reaction_rule = r.gene_reaction_rule
+            model_reaction.add_metabolites(
+                dict([(model_compounds[c.id], v) for (c, v) in r.metabolites.items()])
+            )
+            model_reactions.append(model_reaction)
 
-        model_biomass = []
+        model_biomass = {}
         for r in self.biomass_reactions:
+            reaction_biomass = self.convert_reaction_to_biomass(r)
+            model_biomass[reaction_biomass.id] = reaction_biomass
+            """
+            
             biomass_compounds = []
             metabolites = r.metabolites
             for m in metabolites:
@@ -124,48 +176,65 @@ class CobraModelConverter:
                 'id': r.id,
                 'name': r.name,
                 'biomasscompounds': biomass_compounds,
-                'dna': 0.031,
-                'rna': 0.21,
-                'protein': 0.563,
-                'cellwall': 0.177,
-                'cofactor': 0.039,
-                'energy': 40,
-                'lipid': 0.093,
+                'dna': 0,
+                'rna': 0,
+                'protein': 0,
+                'cellwall': 0,
+                'cofactor': 0,
+                'energy': 0,
+                'lipid': 0,
                 'other': 0,
                 'edits': {},
                 'deleted_compounds': {},
                 'removedcompounds': []
               }
             model_biomass.append(biomass)
+            """
 
         if len(model_biomass) == 0:
-            logger.warning('no biomass reaction provided or detected')
+            logger.warning("no biomass reaction provided or detected")
 
         model_base = {
-            '__VERSION__': 1,
-            'id': self.model_id,
-            'source_id': self.model_id,
-            'name': self.model_id,
-            'source': 'ModelSEEDpy',
-            'modelcompartments': model_compartments,
-            'modelcompounds': model_compounds,
-            'modelreactions': model_reactions,
-            'biomasses': model_biomass,
-            'attributes': {'auxotrophy': {}, 'fbas': {}, 'gene_count': 0, 'pathways': {}},
-            'contig_coverages': {},
-            'delete_biomasses': {},
-            'deleted_reactions': {},
-            'gapfilledcandidates': [], 'gapfillings': [], 'gapgens': [],
-            'loops': [],
-            'model_edits': [],
-            'other_genome_refs': [],
-            'quantopts': [],
-            'template_ref': self.get_template_ref(),
-            'template_refs': [self.get_template_ref()],
-            'type': 'GenomeScale'
+            "__VERSION__": 1,
+            "id": self.model_id,
+            "source_id": self.model_id,
+            "name": self.model_id,
+            "source": "ModelSEEDpy",
+            "modelcompartments": model_compartments,
+            "modelcompounds": [o._to_json() for o in model_compounds.values()],
+            "modelreactions": [],
+            # 'modelreactions': [o._to_json() for o in model_reactions],
+            "biomasses": [o._to_json() for o in model_biomass.values()],
+            "attributes": {
+                "auxotrophy": {},
+                "fbas": {},
+                "gene_count": 0,
+                "pathways": {},
+            },
+            "contig_coverages": {},
+            "delete_biomasses": {},
+            "deleted_reactions": {},
+            "gapfilledcandidates": [],
+            "gapfillings": [],
+            "gapgens": [],
+            "genome_ref": "",
+            "loops": [],
+            "model_edits": [],
+            "other_genome_refs": [],
+            "quantopts": [],
+            "template_ref": self.get_template_ref(),
+            "template_refs": [self.get_template_ref()],
+            "type": "GenomeScale",
         }
         if self.get_genome_ref():
-            model_base['genome_ref'] = self.get_genome_ref()
+            model_base["genome_ref"] = self.get_genome_ref()
 
         cobra_model = FBAModelBuilder(model_base).build()
-        return model_base, cobra_model
+        cobra_model.genome = self.genome
+        cobra_model.name = self.model.name
+        cobra_model.notes = self.model.notes
+        cobra_model.annotation = self.model.annotation
+        cobra_model.add_groups(self.model.groups)
+        #
+        cobra_model.add_reactions(model_reactions)
+        return cobra_model
