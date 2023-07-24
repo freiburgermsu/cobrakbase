@@ -25,10 +25,9 @@ setup(
         "Natural Language :: English",
     ],
     install_requires=[
-        # "modelseedpy >= 1.0.0", # when available in pypi
         "pandas >= 1.0.0",
         "networkx >= 2.4",
-        "modelseedpy >= 0.3.0",
+        "modelseedpy >= 0.2.0",
     ],
     zip_safe=True,
 )
