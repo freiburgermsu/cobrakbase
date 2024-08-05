@@ -33,15 +33,30 @@ def _read_kbase_zip(path):
 
 def load_kbase_zip_object(filename):
     item_info, item_data = _read_kbase_zip(filename)
-    data = {
-        'data': [
-            {
-                'info': item_info['metadata'][0],
-                'provenance': [item_info['provenance'][0]['provenance'][0]],
-                'data': item_data
-            }
-        ]
-    }
-
-    factory = KBaseObjectFactory()
-    return factory.create(data, None)
+    if item_info is None:
+        raise ValueError('invalid kbase zip file. unable to detect object workspace info')
+    if item_data is None:
+        raise ValueError('invalid kbase zip file. unable to detect object data')
+    legacy = 'info' not in item_info
+    if legacy:
+        data = {
+            'data': [
+                {
+                    'info': item_info['metadata'][0],
+                    'provenance': [item_info['provenance'][0]['provenance'][0]],
+                    'data': item_data
+                }
+            ]
+        }
+        KBaseObjectFactory().create(data, None)
+    else:
+        data = {
+            'data': [
+                {
+                    'info': item_info['info'],
+                    'provenance': [],
+                    'data': item_data
+                }
+            ]
+        }
+        return KBaseObjectFactory().create(data, None)

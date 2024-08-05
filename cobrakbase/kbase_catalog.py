@@ -1,7 +1,7 @@
 from cobrakbase.kbase_object_info import KBaseObjectInfo
 
 PROD_WS_MEDIA = 'KBaseMedia'
-PROD_WS_GENOMES = '?'
+PROD_WS_GENOMES = 'ReferenceDataManager'
 PROD_WS_TEMPLATES = 'NewKBaseModelTemplates'
 
 

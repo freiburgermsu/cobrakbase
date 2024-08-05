@@ -55,14 +55,20 @@ def _get_token(user_id, password, auth_svc):
     return tok["token"]
 
 
-def _read_inifile(
-    file=_os.environ.get(  # @ReservedAssignment
-        "KB_DEPLOYMENT_CONFIG", _os.environ["HOME"] + "/.kbase_config"
-    )
-):
+def _read_inifile(file=None):
+    """
+    Filipe: hacked this portion to not crash on machines without HOME env var
+    @param file:
+    @return:
+    """
     # Another bandaid to read in the ~/.kbase_config file if one is present
     authdata = None
-    if _os.path.exists(file):
+    if file is None:
+        # @ReservedAssignment
+        if "HOME" in _os.environ:
+            file = _os.environ.get("KB_DEPLOYMENT_CONFIG", _os.environ["HOME"] + "/.kbase_config")
+
+    if file is not None and _os.path.exists(file):
         try:
             config = _ConfigParser()
             config.read(file)

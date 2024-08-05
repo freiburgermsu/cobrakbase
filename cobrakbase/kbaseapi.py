@@ -284,9 +284,6 @@ class KBaseAPI:
             params["workspace"] = ws
         return KBaseObjectInfo(self.ws_client.save_objects(params)[0])
 
-    def save_model(self, object_id, ws, data):
-        return self.save_object(object_id, ws, "KBaseFBA.FBAModel", data)
-
     def list_objects(self, ws, object_type=None, include_metadata=False):
         """
         List objects of a workspace (i.e., narrative) with either numerical id (e.g., 12345)
@@ -308,28 +305,20 @@ class KBaseAPI:
             params["includeMetadata"] = 1
         return self.ws_client.list_objects(params)
 
+    def list_workspace(self, ws, object_type=None, include_metadata=False):
+        return [KBaseObjectInfo(i) for i in self.list_objects(ws, object_type, include_metadata)]
+
     def get_object_info(self, id_or_ref, workspace=None):
         ref_data = self.ws_client.get_object_info3(
-            {"objects": [self.process_workspace_identifiers(id_or_ref, workspace)],"includeMetadata":1}
+            {"objects": [self.process_workspace_identifiers(id_or_ref, workspace)], "includeMetadata": 1}
         )
         return KBaseObjectInfo(ref_data["infos"][0])
 
-    # TODO: this now seems obfuscated by get_object_info - can we delete this?
-    def get_object_info_from_ref(self, ref):
-        """
-        @deprecated get_object_info
-        """
-        return self.get_object_info(ref)
-
     def copy(self, from_id, from_ws, to_id, to_ws):
-        def copy_object(wclient, from_id, from_ws, to_id, to_ws):
-            params = {
-                "from": {"name": from_id, "workspace": from_ws},
-                "to": {"name": to_id, "workspace": to_ws},
-            }
-            return wclient.copy_object(params)
+        _from = self.process_workspace_identifiers(from_id, from_ws)
+        _to = self.process_workspace_identifiers(to_id, to_ws)
 
-        pass
+        return KBaseObjectInfo(self.ws_client.copy_object({"from": _from, "to": _to}))
 
     def get_workspace_info(self, ws_id_or_name):
         if type(ws_id_or_name) == str:
