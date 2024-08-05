@@ -108,6 +108,8 @@ class FBAModel(KBaseObject, Model):
     SBML_FIELD_CORE_TEMPLATE_REF = "kbase_core_template_ref"
     SBML_FIELD_GENOME_REFS = "kbase_genome_ref"
     SBML_FIELD_ATTRIBUTES = "kbase_attributes"
+    SBML_FIELD_OTHER_GENOME_REFS = "kbase_other_genome_refs"
+    SBML_FIELD_TEMPLATE_REFSS = "kbase_template_refss"
 
     def _get_gapfillings(self):
         if self.SBML_FIELD_GAPFILLINGS in self.notes:
@@ -173,6 +175,17 @@ class FBAModel(KBaseObject, Model):
 
     genome_ref = property(_get_genome_ref, _set_genome_ref)
 
+    def _get_other_genome_refs(self):
+        if self.SBML_FIELD_OTHER_GENOME_REFS in self.notes:
+            return self.notes[self.SBML_FIELD_OTHER_GENOME_REFS].split(";")
+        else:
+            return None
+
+    def _set_other_genome_refs(self, value: list):
+        self.notes[self.SBML_FIELD_OTHER_GENOME_REFS] = ";".join(value)
+
+    other_genome_refs = property(_get_other_genome_refs, _set_other_genome_refs)
+
     def _get_template_ref(self):
         if self.SBML_FIELD_TEMPLATE_REFS in self.notes:
             return self.notes[self.SBML_FIELD_TEMPLATE_REFS]
@@ -184,6 +197,17 @@ class FBAModel(KBaseObject, Model):
 
     template_ref = property(_get_template_ref, _set_template_ref)
 
+    def _get_template_refs(self):
+        if self.SBML_FIELD_TEMPLATE_REFSS in self.notes:
+            return self.notes[self.SBML_FIELD_TEMPLATE_REFSS].split(";")
+        else:
+            return None
+
+    def _set_template_refs(self, value: list):
+        self.notes[self.SBML_FIELD_TEMPLATE_REFSS] = ";".join(value)
+
+    template_refs = property(_get_template_refs, _set_template_refs)
+
     def _get_core_template_ref(self):
         return self.notes.get(self.SBML_FIELD_CORE_TEMPLATE_REF, None)
 
@@ -192,6 +216,7 @@ class FBAModel(KBaseObject, Model):
             self.notes[self.SBML_FIELD_CORE_TEMPLATE_REF] = value
 
     core_template_ref = property(_get_core_template_ref, _set_core_template_ref)
+
 
     def _get_gapgens(self):
         if self.SBML_FIELD_GAPGENS in self.notes:
@@ -238,11 +263,6 @@ class FBAModel(KBaseObject, Model):
         KBaseObject.__init__(self, data, info, args, kbase_type)
         Model.__init__(self, self.data["id"], self.data["name"])
         self._model_compartments = {}
-
-    @staticmethod
-    def from_kbase_json(self, data, info=None, args=None):
-        model = FBAModel({}, info, args)
-        return model
 
     @staticmethod
     def from_kbase_json(self, data, info=None, args=None):
@@ -360,10 +380,20 @@ class FBAModel(KBaseObject, Model):
                 else:
                     data[key] = self.data[key]
 
-        if "kbase_template_refs" in self.notes:
-            template_refs = self.notes["kbase_template_refs"].split(";")
+        if "kbase_template_refss" in self.notes:
+            template_refs = self.notes["kbase_template_refss"].split(";")
             data["template_refs"] = template_refs
-            data["template_ref"] = template_refs[0]
+        else:
+            data["template_refs"] = []
+
+        if "kbase_other_genome_refs" in self.notes:
+            other_genome_refs = self.notes["kbase_other_genome_refs"].split(";")
+            data["other_genome_refs"] = other_genome_refs
+        else:
+            data["other_genome_refs"] = []
+
+        if "kbase_template_refs" in self.notes:
+            data["template_ref"] = self.notes["kbase_template_refs"]   
 
         data["modelcompounds"] = []
         data["modelreactions"] = []

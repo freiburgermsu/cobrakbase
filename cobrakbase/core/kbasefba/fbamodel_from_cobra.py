@@ -176,6 +176,7 @@ class CobraModelConverter:
             )
             model_reaction.notes = r.notes
             model_reaction.annotation = r.annotation
+            print("Converting:",r.id, r.gene_reaction_rule)
             model_reaction.gene_reaction_rule = r.gene_reaction_rule
             model_reaction.add_metabolites(
                 dict([(model_compounds[c.id], v) for (c, v) in r.metabolites.items()])

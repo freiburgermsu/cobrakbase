@@ -227,7 +227,10 @@ class FBAModelBuilder:
                 logger.warning(f"duplicate reaction ID: {reaction.id}")
 
             for complex_data in modelreaction["modelReactionProteins"]:
-                complex_id = complex_data["complex_ref"].split("/")[-1]
+                complex_ref = complex_data.get("complex_ref", None)
+                if complex_ref is None:
+                    continue
+                complex_id = complex_ref.split("/")[-1]
                 notes = {}
                 if complex_id not in complex_groups:
                     complex_group = Group(complex_id)

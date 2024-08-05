@@ -310,7 +310,7 @@ class KBaseAPI:
 
     def get_object_info(self, id_or_ref, workspace=None):
         ref_data = self.ws_client.get_object_info3(
-            {"objects": [self.process_workspace_identifiers(id_or_ref, workspace)]}
+            {"objects": [self.process_workspace_identifiers(id_or_ref, workspace)],"includeMetadata":1}
         )
         return KBaseObjectInfo(ref_data["infos"][0])
 

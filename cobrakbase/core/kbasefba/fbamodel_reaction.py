@@ -160,6 +160,7 @@ class ModelReaction(Reaction):
         imported_gpr=None,
         string_attributes=None,
         numerical_attributes=None,
+        gapfill_data=None
     ):
         super().__init__(reaction_id, name, subsystem, lower_bound, upper_bound)
         self.protons = protons
@@ -167,6 +168,7 @@ class ModelReaction(Reaction):
         self.imported_gpr = imported_gpr
         self.string_attributes = string_attributes
         self.numerical_attributes = numerical_attributes
+        self.gapfill_data = gapfill_data
         self.model_reaction_proteins = None
 
     SBML_FIELD_PROBABILITY = "ms_probability"
@@ -202,6 +204,7 @@ class ModelReaction(Reaction):
             data_copy.get("imported_gpr"),
             data_copy.get("string_attributes"),
             data_copy.get("numerical_attributes"),
+            data_copy.get("gapfill_data")
         )
         reaction.gene_reaction_rule = _get_gpr_string(_get_gpr(data))
         reaction.model_reaction_proteins = [
@@ -209,7 +212,15 @@ class ModelReaction(Reaction):
         ]
         complex_ids = set()
         for complex_data in data.get("modelReactionProteins", []):
-            complex_id = complex_data["complex_ref"].split("/")[-1]
+            complex_ref = complex_data.get("complex_ref", None)
+            if complex_ref is None:
+                gene_list = []
+                for subunit in complex_data["modelReactionProteinSubunits"]:
+                    for feature_ref in subunit["feature_refs"]:
+                        gene_list.append(feature_ref.split("/")[-1])
+                reaction.notes["new_genes"] = ";".join(sorted(gene_list))
+                continue
+            complex_id = complex_ref.split("/")[-1]
             complex_ids.add(complex_id)
         if len(complex_ids) > 0:
             reaction.notes["modelseed_complex"] = ";".join(sorted(list(complex_ids)))
@@ -329,6 +340,16 @@ class ModelReaction(Reaction):
                     logger.warning(
                         f"IGNORE: reaction {self.id} complex {complex_id} not defined in model.groups"
                     )
+        elif "new_genes" in self.notes:
+            gene_ref_list = []
+            gene_list = self.notes["new_genes"].split(";")
+            for gene in gene_list:
+                gene_ref_list.append("~/genome/features/id/" + gene)
+            proteins_list = [{
+                "note": "Gene candidate added during gapfilling",
+                "source": "COBRApy model data",
+                "modelReactionProteinSubunits": [{"feature_refs": gene_ref_list}]
+            }]
 
         elif "genome" in dir(self.model) and type(self.model.genome) == KBaseGenome:
             from modelseedpy.core.msmodel import get_set_set
@@ -376,4 +397,6 @@ class ModelReaction(Reaction):
             data["string_attributes"] = self.string_attributes
         if self.numerical_attributes is not None:
             data["numerical_attributes"] = self.numerical_attributes
+        if self.gapfill_data is not None:
+            data["gapfill_data"] = self.gapfill_data
         return data

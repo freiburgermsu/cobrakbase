@@ -350,7 +350,7 @@ module KBaseFBA {
     /* 
     	ModelReactionProteinSubunit object
     	
-		@searchable ws_subset role triggering optionalSubunit feature_refs
+		@optional note role triggering optionalSubunit
     */
     typedef structure {
 		string role;
@@ -363,7 +363,7 @@ module KBaseFBA {
     /* 
     	ModelReactionProtein object
     	
-    	@optional source complex_ref
+    	@optional source complex_ref note
     */
     typedef structure {
 		complex_ref complex_ref;
@@ -522,7 +522,7 @@ module KBaseFBA {
     /* 
     	FBAModel object
     	
-    	@optional other_genome_refs attributes abstractreactions gapfilledcandidates metagenome_ref genome_ref template_refs ATPSynthaseStoichiometry ATPMaintenance quantopts
+    	@optional  drain_list other_genome_refs attributes abstractreactions gapfilledcandidates metagenome_ref genome_ref template_refs ATPSynthaseStoichiometry ATPMaintenance quantopts
 		@metadata ws source_id as Source ID
 		@metadata ws source as Source
 		@metadata ws name as Name
@@ -565,6 +565,8 @@ module KBaseFBA {
 		list<ModelReaction> gapfilledcandidates;
 		
 		ComputedAttributes attributes;
+		
+		mapping<modelcompound_id,tuple<float uptake,float excretion> > drain_list;
     } FBAModel;
     
     /* 
@@ -1701,7 +1703,6 @@ module KBaseFBA {
     	TemplateCompound parallel to compound object in biochemistry compound_ref
     	
     	@optional compound_ref md5
-    	Z25 4437
     */
 	typedef structure {
 		templatecompound_id id;
@@ -1742,6 +1743,8 @@ module KBaseFBA {
     
     /* 
     	TemplateRole object representing link to annotations or genes
+    	
+    	@optional source aliases features
     */
     typedef structure {
     	templaterole_id id;
@@ -1843,7 +1846,7 @@ module KBaseFBA {
     /* 
     	ModelTemplate object holds data on how a model is constructed from an annotation
     	    	
-    	@optional name
+    	@optional name drain_list
     */
 	typedef structure {
     	modeltemplate_id id;
@@ -1860,6 +1863,8 @@ module KBaseFBA {
     	list<NewTemplateReaction> reactions;
     	list<NewTemplateBiomass> biomasses;
     	list<TemplatePathway> pathways;
+    	
+    	mapping<templatecompcompound_id,tuple<float uptake,float excretion> > drain_list;
     } NewModelTemplate;
     
     /* 
