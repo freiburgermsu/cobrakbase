@@ -1,4 +1,5 @@
 import logging
+import json
 from cobrakbase.core.kbasefba.fbamodel_builder import FBAModelBuilder
 from cobrakbase.core.kbasefba.fbamodel_metabolite import ModelCompound
 from cobrakbase.core.kbasefba.fbamodel_reaction import ModelReaction
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class CobraModelConverter:
-    
+
     def __init__(self, model, genome=None, template=None, bio_reactions=None, e="e"):
         self.biomass_reactions_ids = bio_reactions
         if self.biomass_reactions_ids is None:
@@ -21,6 +22,33 @@ class CobraModelConverter:
         self.extract_seed_it_from_identifier = (
             False  # Detect seed id from identifier if annotation is missing
         )
+
+    def convert_compartment(self, cmp_id):
+        model_compartment = {
+            "id": cmp_id,
+            "label": self.model.compartments.get(cmp_id, cmp_id),
+            "compartment_ref": "~/template/compartments/id/" + cmp_id[:-1],
+        }
+        cmp_meta_data_key = f"kbase_compartment_data_{cmp_id}"
+        if cmp_meta_data_key in self.model.notes:
+            m = self.model.notes[cmp_meta_data_key]
+            if type(m) == str:
+                extra_data = json.loads(m.replace("&apos;", '"'))
+            elif type(m) == dict:
+                extra_data = m
+            else:
+                raise ValueError(
+                    f"note field for {cmp_meta_data_key} must be either str or dict, found: {type(m)}"
+                )
+            if "compartmentIndex" in extra_data:
+                extra_data["compartmentIndex"] = int(extra_data["compartmentIndex"])
+            if "pH" in extra_data:
+                extra_data["pH"] = float(extra_data["pH"])
+            if "potential" in extra_data:
+                extra_data["potential"] = float(extra_data["potential"])
+            model_compartment.update(extra_data)
+
+        return model_compartment
 
     @staticmethod
     def convert_reaction_to_biomass(reaction):
@@ -36,9 +64,8 @@ class CobraModelConverter:
         """
         return (
             type(reaction) == Biomass
-            or "sbo" in reaction.annotation
             or reaction.id in self.biomass_reactions_ids
-            and reaction.annotation["sbo"] == "SBO:0000629"
+            or reaction.annotation.get("sbo") == "SBO:0000629"
         )
 
     @staticmethod

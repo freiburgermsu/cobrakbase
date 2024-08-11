@@ -21,7 +21,7 @@ import cobrakbase.modelseed.modelseed
 
 __author__ = "Filipe Liu"
 __email__ = "fliu@anl.gov"
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 print("cobrakbase", __version__)
 
@@ -32,35 +32,8 @@ SBO_ANNOTATION = "sbo"
 
 bigg = False
 
-API = None
-
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-
-
-def read_model(id, workspace):
-    if API == None:
-        print("Login first! cobrakbase.login(<API_TOKEN>)")
-        return None
-    data = API.get_object(id, workspace)
-    return convert_kmodel(data)
-
-
-def read_model_with_media(modelId, mediaId, workspace):
-    if API == None:
-        print("Login first! cobrakbase.login(<API_TOKEN>)")
-        return None
-    model_data = API.get_object(modelId, workspace)
-    media_data = API.get_object(mediaId, workspace)
-    media = convert_media(media_data)
-    # print(media)
-    return convert_kmodel(model_data, media)
-
-
-def login(token, dev=False):
-    global API
-    API = KBaseAPI(token, dev)
-
 
 SINK = ["cpd02701_c0", "cpd11416_c0", "cpd15302_c0", "cpd11416_c0"]
 
@@ -265,12 +238,6 @@ def convert_kmodel(kmodel, media=None, exchanges=True, model_id="kbase"):
     return model_test
 
 
-def read_kbase_model(filename):
-    kmodel = {}
-    with open(filename) as file:
-        data = file.read()
-        kmodel = json.loads(data)
-    return kmodel
 
 
 def read_json(filename, converter):

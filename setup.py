@@ -5,7 +5,7 @@ with open("README.md") as f:
 
 setup(
     name="cobrakbase",
-    version="0.3.1",
+    version="0.4.0",
     description="KBase interface for COBRApy",
     long_description_content_type="text/markdown",
     long_description=readme,
@@ -25,10 +25,10 @@ setup(
         "Natural Language :: English",
     ],
     install_requires=[
-        # "modelseedpy >= 1.0.0", # when available in pypi
-        "pandas >= 1.0.0",
+        "pandas >= 2.2.2",
+        "cobra >= 0.29.0",
+        "modelseedpy >= 0.4.0",
         "networkx >= 2.4",
-        "modelseedpy >= 0.3.0",
     ],
     zip_safe=True,
 )

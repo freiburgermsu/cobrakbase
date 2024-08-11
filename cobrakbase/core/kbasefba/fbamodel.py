@@ -338,11 +338,14 @@ class FBAModel(KBaseObject, Model):
     def _to_json(self):
         from cobrakbase.core.kbasefba.fbamodel_from_cobra import CobraModelConverter
 
+        converter = CobraModelConverter(self)
+
         data = {}
         ignore = {"modelcompounds", "modelreactions", "biomasses", "modelcompartments"}
 
-        data["modelcompartments"] = []
-        for cmp_id, name in self.compartments.items():
+        data["modelcompartments"] = [converter.convert_compartment(x) for x in self.compartments]
+        """
+        for cmp_id, name in self.compartments:
             model_compartment = {
                 "id": cmp_id,
                 "label": name,
@@ -367,6 +370,7 @@ class FBAModel(KBaseObject, Model):
                     extra_data["potential"] = float(extra_data["potential"])
                 model_compartment.update(extra_data)
             data["modelcompartments"].append(model_compartment)
+        """
 
         for key in self.data_keys:
             if key not in ignore:
@@ -421,7 +425,7 @@ class FBAModel(KBaseObject, Model):
                 )
 
         for reaction in self.reactions:
-            if CobraModelConverter.reaction_is_biomass(reaction):
+            if converter.reaction_is_biomass(reaction):
                 if type(reaction) is Biomass:
                     data["biomasses"].append(reaction._to_json())
                 elif type(reaction) is Reaction:
