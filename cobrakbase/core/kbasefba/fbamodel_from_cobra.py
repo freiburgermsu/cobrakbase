@@ -8,7 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 class CobraModelConverter:
-    def __init__(self, model, genome=None, template=None):
+    
+    def __init__(self, model, genome=None, template=None, bio_reactions=None, e="e"):
+        self.biomass_reactions_ids = bio_reactions
+        if self.biomass_reactions_ids is None:
+            self.biomass_reactions_ids = set()
         self.model = model
         self.model_id = model.id
         self.template = template
@@ -26,14 +30,14 @@ class CobraModelConverter:
         reaction_biomass.annotation = reaction.annotation
         return reaction_biomass
 
-    @staticmethod
-    def reaction_is_biomass(reaction):
+    def reaction_is_biomass(self, reaction):
         """
         detect biomass reaction from SBO term SBO:0000629
         """
         return (
             type(reaction) == Biomass
             or "sbo" in reaction.annotation
+            or reaction.id in self.biomass_reactions_ids
             and reaction.annotation["sbo"] == "SBO:0000629"
         )
 
@@ -128,7 +132,7 @@ class CobraModelConverter:
     @property
     def biomass_reactions(self):
         for reaction in self.model.reactions:
-            if CobraModelConverter.reaction_is_biomass(reaction):
+            if self.reaction_is_biomass(reaction):
                 yield reaction
 
     def build(self):
@@ -159,6 +163,8 @@ class CobraModelConverter:
                 logger.warning(f"duplicate metabolite {model_compound.id}")
 
         model_reactions = []
+        for r in self.model.reactions:
+            pass
         for r in self.metabolic_reactions:
             model_reaction = ModelReaction(
                 r.id,
@@ -170,6 +176,7 @@ class CobraModelConverter:
             )
             model_reaction.notes = r.notes
             model_reaction.annotation = r.annotation
+            print("Converting:",r.id, r.gene_reaction_rule)
             model_reaction.gene_reaction_rule = r.gene_reaction_rule
             model_reaction.add_metabolites(
                 dict([(model_compounds[c.id], v) for (c, v) in r.metabolites.items()])
@@ -247,6 +254,8 @@ class CobraModelConverter:
         }
         if self.get_genome_ref():
             model_base["genome_ref"] = self.get_genome_ref()
+
+        #cobra_model = FBAModel
 
         cobra_model = FBAModelBuilder(model_base).build()
         cobra_model.genome = self.genome

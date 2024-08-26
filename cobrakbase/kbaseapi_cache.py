@@ -1,6 +1,7 @@
 import logging
 import os
 import json
+from pathlib import Path
 from cobrakbase.kbaseapi import KBaseAPI
 from cobrakbase.core.kbase_object_factory import KBaseObjectFactory
 
@@ -15,7 +16,7 @@ class KBaseCache(KBaseAPI):
     def __init__(self, token=None, dev=False, config=None, path=None):
         super().__init__(token, dev, config)
         if path is None:
-            path = "~/.kbase/cache/" + ("dev" if dev else "prod")
+            path = str(Path.home())+"/.kbase/cache/" + ("dev" if dev else "prod")
         if not os.path.exists(path):
             os.makedirs(path)
             logger.warning(f"created folder(s) [{path}]")
@@ -23,8 +24,8 @@ class KBaseCache(KBaseAPI):
             raise ValueError(f"path [{path}] does not exist or is not directory")
         self.path = path
 
-    def get_from_ws(self, id_or_ref, workspace=None):
-        info = self.get_object_info(id_or_ref, workspace)
+    def base_get_object(self, object_id, ws=None):
+        info = self.get_object_info(object_id, ws)
         file_name = f"{info.id}.v{info.version}.json"
         object_path = f"{self.path}/{info.workspace_uid}"
 
@@ -32,12 +33,12 @@ class KBaseCache(KBaseAPI):
         if not os.path.exists(object_path):
             os.makedirs(object_path)
             logger.warning(f"created folder(s) [{object_path}]")
-
+        
         # if json file does not exists fetch and save it otherwise read it from local
         _data = None
         if not os.path.exists(f"{object_path}/{file_name}"):
             res = self.get_objects2(
-                {"objects": [self.process_workspace_identifiers(id_or_ref, workspace)]}
+                {"objects": [self.process_workspace_identifiers(object_id, ws)]}
             )
             if res is None:
                 return None
@@ -48,7 +49,19 @@ class KBaseCache(KBaseAPI):
         else:
             with open(f"{object_path}/{file_name}", "r") as fh:
                 _data = json.load(fh)
-
+        
+        if _data is None:
+            return None
+        return _data
+    
+    def get_object(self, object_id, ws=None):
+        _data = self.base_get_object(object_id, ws)
+        if _data is None:
+            return None
+        return _data["data"]
+    
+    def get_from_ws(self, id_or_ref, workspace=None):
+        _data = self.base_get_object(id_or_ref, workspace)
         if _data is None:
             return None
         factory = KBaseObjectFactory()

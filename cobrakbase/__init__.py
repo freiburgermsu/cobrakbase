@@ -5,6 +5,7 @@ import cobra
 from cobrakbase.core.utils import get_str, get_int, get_id_from_ref
 from cobrakbase.core.converters import KBaseFBAModelToCobraBuilder
 from cobrakbase.kbaseapi import KBaseAPI
+from cobrakbase.kbaseapi_cache import KBaseCache
 from cobrakbase.Workspace.WorkspaceClient import Workspace as WorkspaceClient
 from cobrakbase import flux_analysis
 from cobra.core import Gene, Metabolite, Model, Reaction
@@ -12,6 +13,7 @@ from cobra.util.solver import linear_reaction_coefficients
 import cobrakbase.core.model
 import cobrakbase.core.converters
 import cobrakbase.core.kbasefba
+import cobrakbase.io
 import cobrakbase.modelseed.utils
 import cobrakbase.modelseed.stoich_integration
 import cobrakbase.modelseed.hierarchical_ontology
@@ -62,8 +64,8 @@ def login(token, dev=False):
 
 SINK = ["cpd02701_c0", "cpd11416_c0", "cpd15302_c0", "cpd11416_c0"]
 
-COBRA_DEFAULT_LB = -1000000
-COBRA_DEFAULT_UB = 1000000
+COBRA_DEFAULT_LB = -1000
+COBRA_DEFAULT_UB = 1000
 COBRA_0_BOUND = 0
 
 

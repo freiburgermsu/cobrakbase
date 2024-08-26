@@ -13,7 +13,7 @@ class ModelReactionProteinSubunit:
     """
 
     def __init__(
-        self, role: str, triggering: bool, optional: bool, note: str, features: list
+        self, role: None, triggering: None, optional: None, note: None, features: list
     ):
         """
 
@@ -24,29 +24,42 @@ class ModelReactionProteinSubunit:
         @param features: ['~/genome/features/id/b2930', '~/genome/features/id/b3925']
         """
         self.role = role
-        self.triggering = triggering
-        self.optional = optional
+        if triggering is not None:
+            self.triggering = bool(triggering)
+        else:
+            self.triggering = None
+        if optional is not None:
+            self.optional = bool(optional)
+        else:
+            self.optional = None
         self.note = note
         self.features = features
 
     @staticmethod
     def from_json(data):
         return ModelReactionProteinSubunit(
-            data["role"],
-            data["triggering"] == 1,
-            data["optionalSubunit"] == 1,
-            data["note"],
+            data.get("role", None),
+            data.get("triggering", None),
+            data.get("optionalSubunit", None),
+            data.get("note", None),
             data["feature_refs"],
         )
 
     def get_data(self):
-        d = {
-            "role": self.role,
-            "note": self.note,
-            "triggering": 1 if self.triggering else 0,
-            "optionalSubunit": 1 if self.optional else 0,
-            "feature_refs": self.features,
-        }
+        d = {"feature_refs": self.features}
+        if self.role is not None:
+            d["role"] = self.role
+        if self.note is not None:
+            d["note"] = self.note
+        if self.optionalSubunit is not None:
+            d["optionalSubunit"] = 0
+            if self.optionalSubunit:
+                d["optionalSubunit"] = 1
+        if self.triggering is not None:
+            d["triggering"] = 0
+            if self.triggering:
+                d["triggering"] = 1
+                
         return d
 
 
@@ -82,23 +95,20 @@ class ModelReactionProtein(Group):
             ModelReactionProteinSubunit.from_json(o)
             for o in data["modelReactionProteinSubunits"]
         ]
+
         complex_id = data.get("complex_ref")
-        data_source=None
-        if("source" in data):
-            data_source=data["source"]
         return ModelReactionProtein(
-            complex_id, data["note"], data_source, subunits, complex_id
+            complex_id, data.get("note"), data.get("source"), subunits, complex_id
         )
 
     def get_data(self):
-        d = {
-            "note": self.note,
-            "source": self.source,
-            "modelReactionProteinSubunits": [x.get_data() for x in self.subunits],
-        }
+        d = {"modelReactionProteinSubunits": [x.get_data() for x in self.subunits]}
+        if self.note:
+            d["note"] = self.note
+        if self.source:
+            d["source"] = self.source
         if self.cpx:
             d["complex_ref"] = self.cpx
-
         return d
 
     def __repr__(self):
