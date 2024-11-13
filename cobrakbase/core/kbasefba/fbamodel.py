@@ -392,7 +392,7 @@ class FBAModel(KBaseObject, Model):
         data = {}
         ignore = {"modelcompounds", "modelreactions", "biomasses", "modelcompartments"}
 
-        data["modelcompartments"] = converter.build_model_compartments()
+        data["modelcompartments"] = list(converter.build_model_compartments().values())
 
         for key in self.data_keys:
             if key not in ignore:
